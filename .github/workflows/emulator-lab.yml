@@ -1,0 +1,56 @@
+name: Emulator lab (interactive adb over chisel)
+# Boots a KVM-accelerated Android emulator and hands its adb port to the operator's sandbox through an
+# authenticated chisel reverse tunnel. Nothing from the app repo and no app secrets are used here.
+# Public repository: tunnel URL and credential are read from the event payload and masked before any output.
+on:
+  workflow_dispatch:
+    inputs:
+      tunnel_url:
+        description: chisel server URL (operator sandbox)
+        required: true
+      tunnel_auth:
+        description: one-session chisel credential (masked; server only grants reverse port 15555)
+        required: true
+      minutes:
+        description: session length in minutes
+        default: "240"
+      api:
+        description: Android API level
+        default: "34"
+permissions:
+  contents: read
+concurrency:
+  group: emulator-lab
+  cancel-in-progress: false
+jobs:
+  lab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -la /dev/kvm
+      - name: Fetch chisel
+        run: |
+          curl -sSL -o chisel.gz https://github.com/jpillora/chisel/releases/download/v1.12.0/chisel_1.12.0_linux_amd64.gz
+          gunzip chisel.gz && chmod +x chisel && mv chisel lab/chisel && lab/chisel --version
+      - name: Emulator session
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          LAB_MINUTES: ${{ inputs.minutes }}
+        with:
+          api-level: ${{ inputs.api }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          cores: 3
+          ram-size: 4096M
+          disk-size: 6000M
+          force-avd-creation: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
+          disable-animations: false
+          script: bash lab/session.sh
