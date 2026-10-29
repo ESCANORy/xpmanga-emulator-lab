@@ -17,6 +17,11 @@ on:
       api:
         description: Android API level
         default: "34"
+      gpu:
+        description: emulator GPU mode (guest = render inside the guest, no host render pipe)
+        type: choice
+        default: swiftshader_indirect
+        options: [swiftshader_indirect, guest]
 permissions:
   contents: read
 concurrency:
@@ -51,6 +56,6 @@ jobs:
           ram-size: 4096M
           disk-size: 6000M
           force-avd-creation: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot -feature -HardwareDecoder
+          emulator-options: -no-window -gpu ${{ inputs.gpu || 'swiftshader_indirect' }} -noaudio -no-boot-anim -camera-back none -no-snapshot -feature -HardwareDecoder
           disable-animations: false
           script: bash lab/session.sh
